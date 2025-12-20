@@ -11,6 +11,8 @@ import cv2
 import time
 from pathlib import Path
 import image_processing
+import socket
+import struct
 
 
 def main():
@@ -60,18 +62,27 @@ def main():
         print("Processing camera stream - calculating average intensity (brightness).")
         print("Press Ctrl+C to stop.\n")
         
+        CRIO_IP = "192.164.1.2"
+        PORT = 5010
+        
         try:
-            # Process camera stream and print intensity every second
-            intensity_generator = image_processing.bright_or_dark(selected_camera)
-            last_print_time = time.time()
-            
-            for intensity in intensity_generator:
-                current_time = time.time()
+            with socket.create_connection((CRIO_IP, PORT)) as s:
+                # Process camera stream and print/send intensity every second
+                intensity_generator = image_processing.bright_or_dark(selected_camera)
+                last_print_time = time.time()
                 
-                # Print every second
-                if current_time - last_print_time >= 1.0:
-                    print(f"Average intensity: {intensity:.4f} (normalized 0-1)")
-                    last_print_time = current_time
+                for intensity in intensity_generator:
+                    current_time = time.time()
+                    
+                    # Print and send every second
+                    if current_time - last_print_time >= 1.0:
+                        print(f"Average intensity: {intensity:.4f} (normalized 0-1)")
+                        # Convert intensity (0-1 float) to bytes and send
+                        # Convert numpy float64 to Python float, then pack as 4-byte float
+                        intensity_float = float(intensity)
+                        intensity_bytes = struct.pack('>f', intensity_float)
+                        s.sendall(intensity_bytes)
+                        last_print_time = current_time
                     
         except KeyboardInterrupt:
             print("\n\nProcessing stopped by user.")
